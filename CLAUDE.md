@@ -20,9 +20,23 @@ grassroots-design-system/
 ├── tokens/
 │   ├── colors.css              ← All color custom properties + dark mode
 │   ├── typography.css          ← Font families, scale, utility classes
-│   └── spacing.css             ← Spacing, radius, borders, z-index, layout
+│   ├── spacing.css             ← Spacing, radius, borders, z-index, layout
+│   └── motion.css              ← Duration scale, easing curves, keyframes     [NEW]
 └── components/
-    └── components.css          ← All component classes
+    ├── components.css          ← Core component classes
+    ├── components-new.css      ← Tabs, dropdowns, tooltips, command palette    [NEW]
+    └── responsive.css          ← Breakpoints, mobile nav, bottom sheet         [NEW]
+```
+
+Import order in `index.css`:
+```css
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/motion.css';          /* NEW */
+@import './components/components.css';
+@import './components/components-new.css'; /* NEW */
+@import './components/responsive.css';  /* NEW — always last */
 ```
 
 Always import `index.css`. Never import token files individually in production.
@@ -70,25 +84,16 @@ Two fonts. That's it.
 
 | Token | Size | Weight | Usage |
 |---|---|---|---|
-| `--text-display` | 36px | — (font-display) | Hero / page title |
-| `--text-title` | 24px | — (font-display) | Section heading |
+| `--text-display` | 36px (28px mobile) | — (font-display) | Hero / page title |
+| `--text-title` | 24px (22px mobile) | — (font-display) | Section heading |
 | `--text-heading` | 16px | 500 | Card titles, modal headers |
 | `--text-body` | 14px | 400 | Feed posts, descriptions |
 | `--text-small` | 12px | 400 | Timestamps, metadata |
 | `--text-label` | 11px | 500 | Eyebrows, section labels (always uppercase + tracked) |
 
-Only two weights are used: **400 regular** and **500 medium**. Never use 600, 700, or bold. They feel heavy against the warm neutrals.
+Display and title sizes scale down on mobile automatically via `responsive.css`. No manual overrides needed.
 
-### Utility classes
-
-```html
-<h1 class="text-display">Something worth saying</h1>
-<h2 class="text-title">Section heading</h2>
-<h3 class="text-heading">Card title</h3>
-<p class="text-body">Post content goes here.</p>
-<span class="text-small">2 hours ago</span>
-<span class="text-label">Community</span>
-```
+Only two weights are used: **400 regular** and **500 medium**. Never use 600, 700, or bold.
 
 ---
 
@@ -138,6 +143,144 @@ box-shadow: var(--focus-ring); /* 0 0 0 3px --color-accent-mist */
 
 ---
 
+## Motion [NEW]
+
+All animation flows through `motion.css` tokens. **Never hardcode `transition` durations or `animation` timing functions in component code.**
+
+### Duration scale
+
+| Token | Value | Use |
+|---|---|---|
+| `--duration-instant` | 50ms | Press states, toggle switches |
+| `--duration-fast` | 120ms | Hover, focus ring, color transitions |
+| `--duration-base` | 200ms | Dropdowns, tooltips, standard UI |
+| `--duration-slow` | 320ms | Modals, command palette |
+| `--duration-relaxed` | 480ms | Page choreography, entrance sequences |
+
+### Easing curves
+
+| Token | Curve | Use |
+|---|---|---|
+| `--ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Default for most UI motion |
+| `--ease-enter` | `cubic-bezier(0, 0, 0.2, 1)` | Elements arriving on screen |
+| `--ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | Elements leaving — start fast |
+| `--ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | Bottom sheets, playful moments |
+| `--ease-linear` | `linear` | Spinners and progress bars only |
+
+### Reduced motion
+
+**Never write `@media (prefers-reduced-motion)` in component code.** The `motion.css` token file collapses all durations to `0ms` globally when the user requests reduced motion. Components automatically become instant — no per-component overrides required.
+
+### Transition shorthands
+
+```css
+transition: var(--transition-colors);    /* color + bg + border + opacity */
+transition: var(--transition-transform); /* transform only */
+transition: var(--transition-all);       /* both combined */
+```
+
+### Keyframe utility classes
+
+Apply to elements that enter the DOM:
+
+```html
+<div class="animate-fade-in">…</div>
+<div class="animate-scale-in">…</div>
+<div class="animate-slide-up">…</div>
+<div class="animate-sheet-up">…</div> <!-- mobile bottom sheet -->
+```
+
+For exit animations, add `.is-exiting` before removing from DOM, then remove the element after `--duration-fast`:
+
+```js
+el.classList.add('is-exiting');
+setTimeout(() => el.remove(), 120); // matches --duration-fast
+```
+
+---
+
+## Responsive & mobile [NEW]
+
+Grassroots is **mobile-first**. Base styles target mobile; breakpoints layer up.
+
+### Breakpoints
+
+| Token | Value | Intent |
+|---|---|---|
+| `--bp-sm` | 480px | Large phones, landscape |
+| `--bp-md` | 768px | Tablets |
+| `--bp-lg` | 1024px | Desktop |
+| `--bp-xl` | 1280px | Wide desktop |
+
+Use in media queries:
+```css
+/* Mobile first — base styles are mobile */
+.component { … }
+
+/* Tablet and up */
+@media (min-width: 768px) { .component { … } }
+
+/* Desktop and up */
+@media (min-width: 1024px) { .component { … } }
+```
+
+### Touch targets
+
+All interactive elements on mobile must meet **44×44px minimum** (WCAG 2.5.5). `responsive.css` enforces this on `.btn`, `.action-btn`, and `.input` automatically. The only intentional exception is `.btn-sm` in dense contexts (36px).
+
+Never make a tappable element smaller than 44px on mobile, even if it looks small visually — use padding to expand the hit area.
+
+### Mobile input rule
+
+Inputs on mobile must have `font-size: 16px` minimum. `responsive.css` applies this automatically. If this is missing, iOS will zoom the viewport on focus — a critical UX bug.
+
+### Navbar — top on desktop, bottom on mobile
+
+The `.navbar` component changes layout automatically:
+
+- **Desktop:** Sticky top bar with logo, links, and action buttons.
+- **Mobile:** Fixed bottom tab bar with icon + label pairs. Logo hidden. Actions collapsed into profile tab.
+
+On mobile, add icons to nav links:
+```html
+<!-- Desktop: text links work fine -->
+<a href="/feed" class="navbar-link active">Feed</a>
+
+<!-- Mobile: icon + label pair required -->
+<a href="/feed" class="navbar-link active">
+  <i class="ti ti-home" aria-hidden="true"></i>
+  Feed
+</a>
+```
+
+Add `padding-bottom` to `body` equal to `--mobile-nav-height + safe-area-inset-bottom` so the bottom nav never covers content. `responsive.css` handles this automatically.
+
+### Feed layout
+
+Use `.feed-layout` for the two-column desktop layout. It collapses to single column on tablet and below:
+
+```html
+<div class="feed-layout">
+  <aside class="feed-sidebar">…</aside>
+  <div class="feed-column">…</div>
+</div>
+```
+
+On mobile, `.feed-card` goes full-bleed (no left/right border, border-radius removed). This is intentional — it's more content-native on small screens.
+
+### Safe area insets
+
+For notched/dynamic-island devices, use the safe area tokens:
+
+```css
+padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
+padding-top:    calc(var(--space-lg) + var(--safe-top));
+```
+
+These resolve to `env(safe-area-inset-*)` with `0px` fallbacks.
+
+---
+
 ## Components
 
 ### Buttons
@@ -166,10 +309,288 @@ box-shadow: var(--focus-ring); /* 0 0 0 3px --color-accent-mist */
 ```
 
 **Rules:**
-- Sentence case always. "Create post", not "Create Post".
+- Sentence case always.
 - Verb first: "Save changes", not "Changes saved".
 - One `.btn-primary` per view. All siblings use `.btn-secondary` or `.btn-ghost`.
 - Never disable a button unless there's a clear reason visible on screen.
+
+---
+
+### Tabs [NEW]
+
+Two variants: **underline** (primary page navigation) and **pill** (filter rows).
+
+Both scroll horizontally on mobile. Never wrap tabs onto two lines.
+
+#### Underline tabs
+
+```html
+<div class="tabs">
+  <div class="tab-list" role="tablist">
+    <button class="tab active" role="tab" aria-selected="true">
+      <i class="ti ti-home" aria-hidden="true"></i>
+      Feed
+    </button>
+    <button class="tab" role="tab" aria-selected="false">
+      Communities
+      <span class="tab-badge">3</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false">Saved</button>
+  </div>
+
+  <div class="tab-panel" role="tabpanel">
+    <!-- Active panel content -->
+  </div>
+</div>
+```
+
+Use `role="tablist"`, `role="tab"`, `role="tabpanel"`, and `aria-selected` for accessibility.
+
+Tab badges show counts. The badge fills accent on active, subtle on inactive.
+
+#### Pill tabs (filter row)
+
+```html
+<div class="tab-list-pill">
+  <button class="tab-pill active">All</button>
+  <button class="tab-pill">Design</button>
+  <button class="tab-pill">Engineering</button>
+  <button class="tab-pill">Community</button>
+</div>
+```
+
+Pill tabs don't require `role="tablist"` if they function as filters rather than navigation.
+
+---
+
+### Dropdown menus [NEW]
+
+```html
+<div class="dropdown">
+  <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false">
+    Options <i class="ti ti-chevron-down" aria-hidden="true"></i>
+  </button>
+
+  <div class="dropdown-menu">
+    <button class="dropdown-item">
+      <i class="ti ti-edit" aria-hidden="true"></i>
+      Edit post
+    </button>
+    <button class="dropdown-item">
+      <i class="ti ti-bookmark" aria-hidden="true"></i>
+      Save
+    </button>
+    <div class="dropdown-divider"></div>
+    <button class="dropdown-item danger">
+      <i class="ti ti-trash" aria-hidden="true"></i>
+      Delete post
+    </button>
+  </div>
+</div>
+```
+
+**Alignment modifiers:**
+```html
+<div class="dropdown-menu align-end">…</div>   <!-- right-aligned to trigger -->
+<div class="dropdown-menu align-top">…</div>   <!-- opens upward -->
+```
+
+**With section labels:**
+```html
+<div class="dropdown-menu">
+  <div class="dropdown-label">Account</div>
+  <a href="/profile" class="dropdown-item">…</a>
+  <div class="dropdown-divider"></div>
+  <button class="dropdown-item danger">Sign out</button>
+</div>
+```
+
+**Rules:**
+- Always include an icon in dropdown items. It aids scanability.
+- Danger items (destructive actions) always sit after a divider, at the bottom.
+- Update `aria-expanded` on the trigger when the menu opens and closes.
+- Close on outside click and on `Escape`.
+
+---
+
+### Tooltips [NEW]
+
+Tooltips label icon-only controls. Never use them on elements that already have visible text.
+
+```html
+<div class="tooltip-wrapper">
+  <button class="btn btn-secondary btn-icon" aria-label="Notifications">
+    <i class="ti ti-bell" aria-hidden="true"></i>
+  </button>
+  <span class="tooltip">Notifications</span>
+</div>
+```
+
+**Position variants:**
+
+```html
+<!-- Default: appears above -->
+<span class="tooltip">Label</span>
+
+<!-- Below the trigger -->
+<span class="tooltip tooltip-bottom">Label</span>
+
+<!-- Aligned to right edge -->
+<span class="tooltip tooltip-end">Label</span>
+```
+
+**Rules:**
+- Keep tooltip text to 3 words or fewer. It's a label, not a description.
+- Include keyboard shortcuts in the tooltip when relevant: `"Search (⌘K)"`.
+- Tooltip wrappers need `position: relative` — `.tooltip-wrapper` provides this.
+- The `aria-label` on the button is the accessible name. The tooltip is visual reinforcement only.
+- Dark mode: tooltips automatically invert to a light surface with border. No override needed.
+
+---
+
+### Search & command palette [NEW]
+
+Triggered by `⌘K` (or `Ctrl+K`). Searches across people, communities, posts, and actions simultaneously.
+
+```html
+<!-- Backdrop — closes on outside click -->
+<div class="command-backdrop" id="command-palette" role="dialog" aria-modal="true" aria-label="Search">
+
+  <div class="command-palette">
+
+    <!-- Search input -->
+    <div class="command-input-row">
+      <i class="ti ti-search" aria-hidden="true"></i>
+      <input class="command-input" type="search" placeholder="Search people, communities, posts…" autofocus />
+      <span class="command-shortcut-hint">esc</span>
+    </div>
+
+    <!-- Results -->
+    <div class="command-results" role="listbox">
+
+      <div class="command-section-label">Communities</div>
+
+      <div class="command-item is-active" role="option" aria-selected="true">
+        <div class="command-item-icon">
+          <i class="ti ti-plant" aria-hidden="true"></i>
+        </div>
+        <div class="command-item-body">
+          <div class="command-item-title">
+            <span class="command-match">Des</span>ign Systems
+          </div>
+          <div class="command-item-subtitle">2.4k members · Following</div>
+        </div>
+      </div>
+
+      <div class="command-section-label">Actions</div>
+
+      <div class="command-item" role="option">
+        <div class="command-item-icon"><i class="ti ti-pencil" aria-hidden="true"></i></div>
+        <div class="command-item-body">
+          <div class="command-item-title">New post</div>
+        </div>
+        <span class="command-item-shortcut">⌘N</span>
+      </div>
+
+    </div>
+
+    <!-- Keyboard hints footer -->
+    <div class="command-footer">
+      <span class="command-footer-hint"><kbd>↑↓</kbd> navigate</span>
+      <span class="command-footer-hint"><kbd>↵</kbd> open</span>
+      <span class="command-footer-hint"><kbd>esc</kbd> close</span>
+    </div>
+
+  </div>
+</div>
+```
+
+**Keyboard behaviour to implement:**
+- `⌘K` / `Ctrl+K` — open
+- `↑` / `↓` — move `.is-active` between items
+- `Enter` — follow active item's action
+- `Escape` — close
+- `Tab` — should not cycle through results; use arrow keys
+
+**Match highlighting:**
+Wrap the matched portion of result text in `<span class="command-match">`.
+
+**On mobile:**
+The palette slides up as a bottom sheet automatically (handled by `responsive.css`). The keyboard hint footer is hidden. `autofocus` on the input triggers the software keyboard.
+
+---
+
+### Bottom sheet / modal [NEW]
+
+A single component that behaves differently by breakpoint. Write it once, it adapts.
+
+- **Mobile (< 768px):** Slides up from the bottom with spring easing. Has a drag handle.
+- **Desktop (≥ 768px):** Renders as a centered modal with scale-in animation. Drag handle hidden.
+
+```html
+<!-- Backdrop — always present, closes on click -->
+<div class="sheet-backdrop" role="dialog" aria-modal="true">
+
+  <div class="sheet">
+    <!-- Handle visible on mobile only -->
+    <div class="sheet-handle" aria-hidden="true"></div>
+
+    <div class="sheet-title">Share this post</div>
+
+    <!-- Sheet content -->
+    <div>…</div>
+
+    <!-- Close action -->
+    <button class="btn btn-secondary" style="width:100%;" onclick="closeSheet()">Cancel</button>
+  </div>
+
+</div>
+```
+
+**Rules:**
+- Always include a close/cancel action inside the sheet — never rely on backdrop-click alone.
+- Trap focus inside the sheet while open.
+- On mobile, add `padding-bottom: calc(var(--space-lg) + var(--safe-bottom))` to `.sheet` for notched devices — `responsive.css` handles this.
+- Sheets open with `gr-sheet-up` animation on mobile, `gr-scale-in` on desktop. Add `.is-exiting` before removing from DOM.
+
+---
+
+### Feed card
+
+```html
+<article class="feed-card">
+  <header class="feed-card-header">
+    <div class="avatar avatar-md">MR</div>
+    <div class="feed-card-meta">
+      <div class="feed-card-name">Maya Rodriguez</div>
+      <div class="feed-card-time">
+        2 hours ago · <a href="/c/design" style="color:var(--color-accent);">Community Design</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="feed-card-body">
+    Post content goes here.
+  </div>
+
+  <footer class="feed-card-actions">
+    <button class="action-btn">
+      <i class="ti ti-heart" aria-hidden="true"></i>
+      48
+    </button>
+    <button class="action-btn">
+      <i class="ti ti-message-circle" aria-hidden="true"></i>
+      12
+    </button>
+    <button class="action-btn">
+      <i class="ti ti-share" aria-hidden="true"></i>
+      Share
+    </button>
+  </footer>
+</article>
+```
+
+On mobile, feed cards go full-bleed automatically (no horizontal borders, no radius). This is intentional.
 
 ---
 
@@ -201,24 +622,23 @@ box-shadow: var(--focus-ring); /* 0 0 0 3px --color-accent-mist */
 <!-- Error state -->
 <div class="field">
   <label class="field-label">Email</label>
-  <input class="input input-error" type="email" value="not-an-email" />
+  <input class="input input-error" type="email" />
   <span class="field-error">Enter a valid email address.</span>
 </div>
 
 <!-- Textarea -->
-<textarea class="input" rows="4" placeholder="Share something..."></textarea>
+<textarea class="input" rows="4" placeholder="Share something…"></textarea>
 ```
+
+On mobile, inputs automatically use `font-size: 16px` to prevent iOS viewport zoom.
 
 ---
 
 ### Avatars
 
 ```html
-<!-- Default (md) -->
-<div class="avatar avatar-md">MR</div>
-
-<!-- Sizes -->
 <div class="avatar avatar-sm">MR</div>
+<div class="avatar avatar-md">MR</div>  <!-- Default -->
 <div class="avatar avatar-lg">MR</div>
 <div class="avatar avatar-xl">MR</div>
 
@@ -231,48 +651,8 @@ box-shadow: var(--focus-ring); /* 0 0 0 3px --color-accent-mist */
 <div class="avatar-group">
   <div class="avatar avatar-sm">MR</div>
   <div class="avatar avatar-sm">JK</div>
-  <div class="avatar avatar-sm">AL</div>
   <div class="avatar avatar-sm" style="background:var(--color-surface);color:var(--color-secondary);">+4</div>
 </div>
-```
-
-Avatar initials are always 2 characters. Overflow count ("+4") uses muted colors, not accent.
-
----
-
-### Feed card
-
-```html
-<article class="feed-card">
-  <header class="feed-card-header">
-    <div class="avatar avatar-md">MR</div>
-    <div class="feed-card-meta">
-      <div class="feed-card-name">Maya Rodriguez</div>
-      <div class="feed-card-time">
-        2 hours ago · <a href="/c/design" style="color:var(--color-accent);">Community Design</a>
-      </div>
-    </div>
-  </header>
-
-  <div class="feed-card-body">
-    Post content goes here. Keep line-height at --leading-body (1.65) for readability.
-  </div>
-
-  <footer class="feed-card-actions">
-    <button class="action-btn">
-      <i class="ti ti-heart" aria-hidden="true"></i>
-      48
-    </button>
-    <button class="action-btn">
-      <i class="ti ti-message-circle" aria-hidden="true"></i>
-      12
-    </button>
-    <button class="action-btn">
-      <i class="ti ti-share" aria-hidden="true"></i>
-      Share
-    </button>
-  </footer>
-</article>
 ```
 
 ---
@@ -284,12 +664,34 @@ Avatar initials are always 2 characters. Overflow count ("+4") uses muted colors
   <a href="/" class="navbar-logo">Grassroots</a>
 
   <ul class="navbar-links">
-    <li><a href="/feed" class="navbar-link active">Feed</a></li>
-    <li><a href="/explore" class="navbar-link">Explore</a></li>
-    <li><a href="/communities" class="navbar-link">Communities</a></li>
+    <!-- Include icons — they appear on mobile bottom nav -->
+    <li>
+      <a href="/feed" class="navbar-link active">
+        <i class="ti ti-home" aria-hidden="true"></i>
+        Feed
+      </a>
+    </li>
+    <li>
+      <a href="/explore" class="navbar-link">
+        <i class="ti ti-compass" aria-hidden="true"></i>
+        Explore
+      </a>
+    </li>
+    <li>
+      <a href="/communities" class="navbar-link">
+        <i class="ti ti-plant" aria-hidden="true"></i>
+        Communities
+      </a>
+    </li>
   </ul>
 
   <div class="navbar-actions">
+    <div class="tooltip-wrapper">
+      <button class="btn btn-secondary btn-icon" aria-label="Search" onclick="openCommandPalette()">
+        <i class="ti ti-search" aria-hidden="true"></i>
+      </button>
+      <span class="tooltip">Search (⌘K)</span>
+    </div>
     <button class="btn btn-secondary btn-icon" aria-label="Notifications">
       <i class="ti ti-bell" aria-hidden="true"></i>
     </button>
@@ -298,7 +700,7 @@ Avatar initials are always 2 characters. Overflow count ("+4") uses muted colors
 </nav>
 ```
 
-The navbar is `position: sticky; top: 0`. It always sits above the feed on scroll.
+Icons on nav links are required — they're the only label visible on the mobile bottom tab bar.
 
 ---
 
@@ -317,7 +719,7 @@ The navbar is `position: sticky; top: 0`. It always sits above the feed on scrol
 </div>
 ```
 
-Empty states are invitations, not apologies. The title names the space. The body says what to do. The CTA is a verb.
+Empty states are invitations, not apologies. Title names the space. Body says what to do. CTA is a verb.
 
 ---
 
@@ -325,7 +727,7 @@ Empty states are invitations, not apologies. The title names the space. The body
 
 ```html
 <div class="notif">
-  <div class="notif-dot"></div>           <!-- Unread: filled sage -->
+  <div class="notif-dot"></div>
   <div>
     <div class="notif-text">
       <strong style="font-weight:500;">Jonah Kim</strong> liked your post.
@@ -335,7 +737,7 @@ Empty states are invitations, not apologies. The title names the space. The body
 </div>
 
 <div class="notif">
-  <div class="notif-dot read"></div>      <!-- Read: hollow dot -->
+  <div class="notif-dot read"></div>
   <div>
     <div class="notif-text">3 people started following you.</div>
     <div class="notif-time">Yesterday</div>
@@ -362,18 +764,19 @@ Toasts are brief, past-tense, no punctuation unless needed. "Post published", no
 This system uses [Tabler Icons](https://tabler.io/icons) (outline only).
 
 ```html
-<!-- Load via CDN in <head> -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
 
-<!-- Usage -->
 <i class="ti ti-heart" aria-hidden="true"></i>
 <i class="ti ti-message-circle" aria-hidden="true"></i>
 <i class="ti ti-share" aria-hidden="true"></i>
 <i class="ti ti-bell" aria-hidden="true"></i>
 <i class="ti ti-search" aria-hidden="true"></i>
-<i class="ti ti-user" aria-hidden="true"></i>
-<i class="ti ti-settings" aria-hidden="true"></i>
 <i class="ti ti-home" aria-hidden="true"></i>
+<i class="ti ti-compass" aria-hidden="true"></i>
+<i class="ti ti-plant" aria-hidden="true"></i>
+<i class="ti ti-settings" aria-hidden="true"></i>
+<i class="ti ti-chevron-down" aria-hidden="true"></i>
+<i class="ti ti-dots" aria-hidden="true"></i>
 ```
 
 - Always **outline** variants. Never `-filled` suffixes.
@@ -391,21 +794,26 @@ This system uses [Tabler Icons](https://tabler.io/icons) (outline only).
 --content-max-width: 960px;  /* Outer page wrapper */
 ```
 
-The feed is single-column, centered, max 640px. This is not negotiable — wider feeds hurt readability and feel like a desktop product, not a social platform.
+The feed is single-column, centered, max 640px. This is not negotiable.
 
-Standard page shell:
+**Standard two-column page shell (desktop):**
 
 ```html
 <body>
   <nav class="navbar">…</nav>
 
-  <main style="max-width: var(--content-max-width); margin: 0 auto; padding: var(--space-xl);">
-    <div style="max-width: var(--feed-max-width); margin: 0 auto;">
-      <!-- Feed content -->
+  <div class="feed-layout">
+    <aside class="feed-sidebar">
+      <!-- Left sidebar: profile summary, suggested communities -->
+    </aside>
+    <div class="feed-column">
+      <!-- Feed cards -->
     </div>
-  </main>
+  </div>
 </body>
 ```
+
+`.feed-layout` handles the responsive collapse — sidebar disappears on tablet and below.
 
 ---
 
@@ -415,9 +823,10 @@ Standard page shell:
 - **Verb-first on CTAs.** "Create post", "Edit profile", "Follow community".
 - **No "successfully".** "Post published", not "Your post was published successfully."
 - **No "please".** "Enter a display name", not "Please enter a display name."
-- **No exclamation marks** on system copy. "Changes saved." not "Changes saved!"
-- **Errors say what happened and what to do.** "That username's taken. Try another." Not "Error 409."
-- **Empty states are invitations.** "Your feed is quiet" + "Follow people to see their posts here." Not "Nothing here yet."
+- **No exclamation marks** on system copy.
+- **Errors say what happened and what to do.** "That username's taken. Try another."
+- **Empty states are invitations.** "Your feed is quiet" + "Follow people to see their posts here."
+- **Tooltip text is a label, not a sentence.** "Notifications", not "View your notifications".
 
 ---
 
@@ -428,25 +837,42 @@ Standard page shell:
 | Hardcode hex values | Use `--color-*` tokens |
 | Use blue for interactive states | Use `--color-accent` (sage green) |
 | Use `font-weight: 600` or `700` | Max is `500` |
-| Add drop shadows to cards | Hairline borders only (`--border-default`) |
+| Add drop shadows to cards | Hairline borders only |
 | Use `border: 1px` | Always `0.5px` |
 | Use DM Serif Display for body text | Only for wordmark and display headings |
 | Use more than one `.btn-primary` per view | Demote extras to `.btn-secondary` |
 | Write "successfully" in toast copy | Just state what happened |
 | Create new spacing values outside the scale | Use the closest `--space-*` token |
 | Introduce a second accent color | Sage green is the only interactive color |
+| Hardcode durations in transitions | Use `--duration-*` tokens |
+| Write `@media (prefers-reduced-motion)` in components | Trust motion tokens — they collapse globally |
+| Use `font-size` below 16px on mobile inputs | Causes iOS viewport zoom |
+| Make touch targets smaller than 44px | Use padding to expand hit area |
+| Tooltip text longer than ~3 words | It's a label, not a description |
+| Show tooltips on elements with visible text | Tooltips are for icon-only controls only |
+| Use dropdown without danger items after a divider | Group and order for safety |
+| Wrap nav links to two rows on mobile | Enforce horizontal scroll instead |
 
 ---
 
 ## Checklist before shipping a screen
 
 - [ ] All colors reference `--color-*` tokens
-- [ ] No hardcoded hex, rgb, or rgba values in component styles
+- [ ] No hardcoded hex, rgb, or rgba values
 - [ ] All borders are 0.5px
 - [ ] Focus states use `--focus-ring` box-shadow
 - [ ] One `.btn-primary` maximum per view
 - [ ] DM Serif Display used only for display/title roles
 - [ ] All text is sentence case
 - [ ] Icons have `aria-hidden="true"` or `aria-label` on parent
-- [ ] Dark mode works (tokens flip automatically — just don't override them)
-- [ ] Feed content is constrained to `--feed-max-width` (640px)
+- [ ] Dark mode works (tokens flip automatically)
+- [ ] Feed content constrained to `--feed-max-width` (640px)
+- [ ] All transitions use `--duration-*` and `--ease-*` tokens
+- [ ] No manual `@media (prefers-reduced-motion)` overrides in component code
+- [ ] Mobile touch targets meet 44px minimum
+- [ ] Text inputs use `font-size: 16px` minimum on mobile (prevents iOS zoom)
+- [ ] Nav links include icons (required for mobile bottom tab bar)
+- [ ] Tooltips only on icon-only controls, text ≤ 3 words
+- [ ] Dropdown danger items sit after a divider, at the bottom
+- [ ] Bottom sheets have an explicit close action inside (not backdrop-only)
+- [ ] Safe area insets applied wherever content meets screen edges
